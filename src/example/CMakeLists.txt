@@ -13,22 +13,22 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../../examples)
 
 
 add_executable(c_example c_example.c)
-target_link_libraries(c_example Grackle::Grackle)
+target_link_libraries(c_example Grackle::Grackle /opt/homebrew/lib/libjsonfortran.a)
 
 add_executable(c_local_example c_local_example.c)
-target_link_libraries(c_local_example Grackle::Grackle)
+target_link_libraries(c_local_example Grackle::Grackle /opt/homebrew/lib/libjsonfortran.a)
 
 set(CMAKE_CXX_STANDARD 11) # needed by apple-clang compiler for some examples
 
 add_executable(cxx_example cxx_example.C)
-target_link_libraries(cxx_example Grackle::Grackle)
+target_link_libraries(cxx_example Grackle::Grackle /opt/homebrew/lib/libjsonfortran.a)
 
 add_executable(cxx_grid_example cxx_grid_example.C)
-target_link_libraries(cxx_grid_example Grackle::Grackle)
+target_link_libraries(cxx_grid_example Grackle::Grackle /opt/homebrew/lib/libjsonfortran.a)
 
 if (GRACKLE_USE_OPENMP)
   add_executable(cxx_omp_example cxx_omp_example.C)
-  target_link_libraries(cxx_omp_example Grackle::Grackle)
+  target_link_libraries(cxx_omp_example Grackle::Grackle /opt/homebrew/lib/libjsonfortran.a)
 endif()
 
 # the following target uses -O1 optimization because problems can arise with
@@ -36,4 +36,4 @@ endif()
 # details about the problems
 add_executable(fortran_example fortran_example.F)
 target_compile_options(fortran_example PRIVATE "-O1")
-target_link_libraries(fortran_example Grackle::Grackle)
+target_link_libraries(fortran_example Grackle::Grackle /opt/homebrew/lib/libjsonfortran.a)

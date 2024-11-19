@@ -13,3 +13,8 @@ add_executable(runLocalSolveChemistryTest test_local_solve_chemistry.cpp)
 target_link_libraries(runLocalSolveChemistryTest functestdeps)
 
 gtest_discover_tests(runLocalSolveChemistryTest)
+
+add_executable(runCalcTDustTest test_func_calc_tdust_1d_g.cpp)
+target_link_libraries(runCalcTDustTest functestdeps)
+
+gtest_discover_tests(runCalcTDustTest)

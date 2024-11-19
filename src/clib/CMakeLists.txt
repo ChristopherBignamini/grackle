@@ -53,9 +53,9 @@ function(query_version option OUTVAR)
   set(${OUTVAR} ${OUT} PARENT_SCOPE)
 endfunction()
 
-query_version(show-version VERSION_NUM)
-query_version(git-branch GIT_BRANCH)
-query_version(git-revision GIT_REVISION)
+#query_version(show-version VERSION_NUM)
+#query_version(git-branch GIT_BRANCH)
+#query_version(git-revision GIT_REVISION)
 
 # in the original build-system, the following string also included things like:
 # include-args, linking flags, macro definitions, all other compiler flags...
@@ -202,9 +202,9 @@ set_target_properties(Grackle_Grackle PROPERTIES
 # of how Grackle is consume, we use this custom function that wraps
 # set_target_properties (it's important to identify what is a BOOL vs STRING)
 include(TargetInfoProps)
-set_target_typed_info_properties(Grackle_Grackle STRING_PROPERTIES
-  GRACKLE_VERSION_STR "${VERSION_NUM}"
-)
+#set_target_typed_info_properties(Grackle_Grackle STRING_PROPERTIES
+#  GRACKLE_VERSION_STR "${VERSION_NUM}"
+#)
 set_target_typed_info_properties(Grackle_Grackle BOOL_PROPERTIES
   GRACKLE_USE_DOUBLE "${GRACKLE_USE_DOUBLE}"
   GRACKLE_USE_OPENMP "${GRACKLE_USE_OPENMP}"
@@ -229,6 +229,7 @@ target_link_libraries(Grackle_Grackle
           GRACKLE_HDF5_C
           $<$<BOOL:${GRACKLE_USE_OPENMP}>:OpenMP::OpenMP_Fortran>
           $<$<BOOL:${GRACKLE_USE_OPENMP}>:OpenMP::OpenMP_C>
+          /opt/homebrew/lib/libjsonfortran.a
 )
 
 # add the necessary compiler-specific Fortran flags to ensure proper handling
@@ -268,4 +269,9 @@ if (BUILD_SHARED_LIBS)
   create_example_config_Makefile(
     "Make.examples-config" "Grackle::Grackle" "${GRACKLE_FC_FLAG}"
   )
+endif()
+
+# Add GENERATE_DATASETS option available
+if(GENERATE_DATASETS)
+  add_definitions(-DGENERATE_DATASETS)
 endif()

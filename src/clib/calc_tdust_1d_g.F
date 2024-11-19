@@ -38,6 +38,10 @@
 !
 !-----------------------------------------------------------------------
 
+#ifdef GENERATE_DATASETS
+      use json_module
+#endif
+
       implicit NONE
 #include "grackle_fortran_types.def"
 
@@ -80,8 +84,68 @@
      &       bi_t_mid(in), bi_t_high(in)
       logical nm_itmask(in), bi_itmask(in)
 
+
+!  JSON dataset generation
+#ifdef GENERATE_DATASETS
+
+      character(len=80) :: json_filename
+      type(json_core) :: json
+      type(json_value),pointer :: p, inputs, outputs
+      logical :: store_data, file_exists
+
+#endif
+
 !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/////////////////////////////////
 !=======================================================================
+
+#ifdef GENERATE_DATASETS
+
+#ifdef _OPENMP
+      if (omp_get_thread_num() .eq. 0) then
+#endif
+      print*, "CALC_TDUST_1D_G: Generating datasets"
+!     Check if file exists, we don't want to overwrite it
+      json_filename = "/Users/bignamic/Development/SPH-EXA/GrackleWorks/datasets/calc_tdust_1d_g.json"
+      inquire(file=trim(json_filename), exist=file_exists)
+      if (file_exists) then
+         store_data = .false.
+      else
+         store_data = .true.
+      endif
+      if (store_data) then
+
+         call json%initialize()
+         call json%create_object(p,'')
+
+! add the "inputs" section:
+         call json%create_object(inputs,'inputs')
+         call json%add(p, inputs)
+
+   ! add variables to the "inputs" section:
+         call json%add(inputs, 'tdust', tdust)
+         call json%add(inputs, 'tgas', tgas)
+         call json%add(inputs, 'nh', nh)
+         call json%add(inputs, 'gasgr', gasgr)
+         call json%add(inputs, 'gamma_isrfa', gamma_isrfa)
+         call json%add(inputs, 'isrf', isrf)
+         call json%add(inputs, 'itmask', itmask)
+         call json%add(inputs, 'trad', trad)
+         call json%add(inputs, 'in', in)
+         call json%add(inputs, 'is', is)
+         call json%add(inputs, 'ie', ie)
+         call json%add(inputs, 'j', j)
+         call json%add(inputs, 'k', k)
+         nullify(inputs)
+   
+      endif
+#endif
+
+#ifdef _OPENMP
+      endif
+#endif
+
+   !!!!!!!!!!!!!!!!!
+
 
       pert_i = 1.e-3_DKIND
 
@@ -301,6 +365,50 @@ c               ERROR_MESSAGE
             tdust(i) = tdustnow(i)
          endif
       enddo
+
+
+#ifdef GENERATE_DATASETS
+
+#ifdef _OPENMP
+      if (omp_get_thread_num() .eq. 0) then
+#endif
+
+! Check if dataset generation is enabled
+      if (store_data) then
+
+! Add the "outputs" section
+         call json%create_object(outputs,'outputs')
+         call json%add(p, outputs)
+
+!     Add variables to the "outputs" section:
+         call json%add(outputs, 'tdust', tdust)
+         call json%add(outputs, 'tgas', tgas)
+         call json%add(outputs, 'nh', nh)
+         call json%add(outputs, 'gasgr', gasgr)
+         call json%add(outputs, 'gamma_isrfa', gamma_isrfa)
+         call json%add(outputs, 'isrf', isrf)
+         call json%add(outputs, 'itmask', itmask)
+         call json%add(outputs, 'trad', trad)
+         call json%add(outputs, 'in', in)
+         call json%add(outputs, 'is', is)
+         call json%add(outputs, 'ie', ie)
+         call json%add(outputs, 'j', j)
+         call json%add(outputs, 'k', k)
+         nullify(outputs)
+
+!     Write the file
+         call json%print(p,json_filename)
+
+!     Cleanup
+         call json%destroy(p)
+
+      endif
+
+#ifdef _OPENMP
+      endif
+#endif
+
+#endif
 
       return
       end

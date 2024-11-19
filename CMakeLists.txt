@@ -206,6 +206,9 @@ if(GRACKLE_BUILD_TESTS)
   add_subdirectory(tests) # declare the recipes for each test
 endif()
 
+# Add GENERATE_DATASETS option available
+option(GENERATE_DATASETS "generate datasets to be used for GoogleTest" OFF)
+
 # Packaging
 # ---------
 # (probably not needed if not root project)
