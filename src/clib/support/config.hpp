@@ -28,8 +28,16 @@
 /// This macro is implemented using the ``_Pragma`` operator, described
 /// [here](https://en.cppreference.com/w/cpp/preprocessor/impl). More details
 /// can be found [here](https://gcc.gnu.org/onlinedocs/cpp/Pragmas.html).
+// NOTE: every call site passes a *quoted string* (e.g. OMP_PRAGMA("omp
+// parallel")), matching OMP_PRAGMA_CRITICAL below. So we must pass the argument
+// straight to _Pragma -- NOT stringize it with `#x`. The old `_Pragma(#x)`
+// double-stringized the already-quoted argument into `_Pragma("\"omp
+// parallel\"")`, i.e. `#pragma "omp parallel"`, which is an invalid pragma that
+// the compiler silently drops. That disabled EVERY `omp parallel`/`omp for`
+// region in the library (leaving it single-threaded), while `omp critical`
+// still worked because OMP_PRAGMA_CRITICAL is written directly.
 #ifdef _OPENMP
-#define OMP_PRAGMA(x) _Pragma(#x)
+#define OMP_PRAGMA(x) _Pragma(x)
 #else
 #define OMP_PRAGMA(x) /* ... */
 #endif

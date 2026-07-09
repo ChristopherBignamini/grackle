@@ -101,12 +101,11 @@ if (GRACKLE_USE_OPENMP)
     )
   endif()
 
-  if(GRACKLE_EXAMPLES)
-    set(_GRACKLE_OMP_COMPONENTS C Fortran CXX)
-  else()
-    set(_GRACKLE_OMP_COMPONENTS C Fortran)
-  endif()
-  find_package(OpenMP REQUIRED COMPONENTS ${_GRACKLE_OMP_COMPONENTS})
+  # CXX is required unconditionally: the core library is now C++, so its
+  # parallel regions (e.g. the omp-parallel loop in solve_rate_cool) and the
+  # _OPENMP guards in the C++ sources only take effect if the .cpp files are
+  # compiled with the OpenMP flag carried by OpenMP::OpenMP_CXX.
+  find_package(OpenMP REQUIRED COMPONENTS C Fortran CXX)
 endif()
 
 # define target to link the math functions of the C standard library

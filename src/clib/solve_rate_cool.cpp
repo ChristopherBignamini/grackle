@@ -31,6 +31,7 @@
 #include "opaque_storage.hpp"
 #include "step_rate_newton_raphson.hpp"
 #include "support/config.hpp"
+#include "support/profiling.hpp"
 #include "utils-cpp.hpp"
 #include "visitor/common.hpp"
 #include "visitor/memory.hpp"
@@ -695,6 +696,12 @@ int solve_rate_cool(
   const gr_float tolerance = (gr_float)(1.0e-10);
 #endif
 
+  // wall-clock timer for the whole routine (no-op unless -DGRACKLE_PROFILE)
+  GRACKLE_PROF_SCOPE(solve_rate_cool_total);
+  // ensure the at-exit profile dump is registered on every code path, including
+  // the early error return below (idempotent: only the first call registers)
+  GRACKLE_PROF_REPORT();
+
   // Set error indicator (we will return this value)
   int ierr = GR_SUCCESS;
 
@@ -864,6 +871,7 @@ int solve_rate_cool(
 
         // compute gas properties (tgas, mmw, rhoH, metallicity, nelec_times_mH)
         // and fill up logTlinterp_buf
+        { GRACKLE_PROF_SCOPE(extended_gas_props);
         extended_gas_props(tgas.data(), mmw.data(), rhoH.data(),
                            metallicity.data(), nelec_times_mH.data(),
                            logTlininterp_buf, imetal, itmask.data(),
@@ -872,6 +880,7 @@ int solve_rate_cool(
                            // if (iter == 1), we act as if there was a previous
                            // iteration where temperature was the same
                            (iter == 1) ? nullptr : &lnT_preparer);
+        }  // GRACKLE_PROF_SCOPE(extended_gas_props)
 
         // record the current temperature (next iteration, these are used for
         // "damping" when we fill up logTlininterp_buf)
@@ -881,6 +890,7 @@ int solve_rate_cool(
         // -> at this time the function also fillls dust2gas and tdust. It can
         //    also modify itmask and itmask_metal
         // -> (we plan to factor out the extra calculations)
+        { GRACKLE_PROF_SCOPE(cool1d_multi_g);
         cool1d_multi_g(
           imetal,
           edot.data(),
@@ -893,6 +903,7 @@ int solve_rate_cool(
           grain_temperatures, logTlininterp_buf,
           cool1dmulti_buf, coolingheating_buf
         );
+        }  // GRACKLE_PROF_SCOPE(cool1d_multi_g)
 
         if (my_chemistry->primordial_chemistry > 0)  {
 
@@ -901,6 +912,7 @@ int solve_rate_cool(
           //
           // -> TODO: passing dt to this function is probably incorrect. See
           //    the C++ docstring for a longer discussion
+          { GRACKLE_PROF_SCOPE(lookup_cool_rates1d);
           grackle::impl::lookup_cool_rates1d(
             idx_range, anydust, tgas.data(), mmw.data(), tdust.data(),
             dust2gas.data(), dom, dx_cgs, c_ljeans, itmask.data(),
@@ -910,16 +922,19 @@ int solve_rate_cool(
             spsolvbuf.rxn_rate_buf, spsolvbuf.chemheatrates_buf,
             internal_dust_prop_scratch_buf
           );
+          }  // GRACKLE_PROF_SCOPE(lookup_cool_rates1d)
 
           // Compute dedot and HIdot, the rates of change of de and HI
           //   (should add itmask to this call)
 
+          { GRACKLE_PROF_SCOPE(rate_timestep);
           grackle::impl::rate_timestep_g(
             spsolvbuf.dedot, spsolvbuf.HIdot, anydust,
             rhoH.data(), itmask.data(), edot.data(),
             chunit, dom, my_chemistry, my_fields, idx_range,
             spsolvbuf.chemheatrates_buf, spsolvbuf.rxn_rate_buf
           );
+          }  // GRACKLE_PROF_SCOPE(rate_timestep)
 
           // Setup masks to identify which chemistry schemes to use. We split
           // cells by density:
@@ -932,12 +947,28 @@ int solve_rate_cool(
             my_chemistry
           );
 
+          // Tally how cells split across solver paths this subcycle (no-op
+          // unless -DGRACKLE_PROFILE). Drives the GPU thread-divergence study.
+#ifdef GRACKLE_PROFILE
+          for (int i = idx_range.i_start; i < idx_range.i_stop; i++) {
+            if (spsolvbuf.itmask_gs[i] != MASK_FALSE) {
+              GRACKLE_PROF_COUNT(cells_gs, 1);
+            } else if (spsolvbuf.itmask_nr[i] != MASK_FALSE) {
+              GRACKLE_PROF_COUNT(cells_nr, 1);
+              if (spsolvbuf.imp_eng[i] == 1) {
+                GRACKLE_PROF_COUNT(cells_nr_coevolve, 1);
+              }
+            }
+          }
+#endif
+
           // Set the max timestep for the current subcycle based on our scheme
           // for updating the chemical network:
           // - for Gauss-Seidel, pick a timestep that keeps relative chemical
           //   changes below 10%
           // - do something else for Newton-Raphson
 
+          { GRACKLE_PROF_SCOPE(set_subcycle_dt);
           set_subcycle_dt_from_chemistry_scheme_(
             dtit.data(), idx_range, iter, dt, ttot.data(), spsolvbuf.itmask_gs,
             spsolvbuf.itmask_nr, spsolvbuf.imp_eng,
@@ -947,6 +978,7 @@ int solve_rate_cool(
             my_chemistry, my_rates, dlogtem, logTlininterp_buf, my_fields,
             spsolvbuf.rxn_rate_buf
           );
+          }  // GRACKLE_PROF_SCOPE(set_subcycle_dt)
         }
 
         const gr_mask_type* energy_itmask =
@@ -976,16 +1008,19 @@ int solve_rate_cool(
           // Solve rate equations with one linearly implicit Gauss-Seidel
           // sweep of a backward Euler method (for all cells specified by
           // itmask_gs)
+          { GRACKLE_PROF_SCOPE(step_rate_gauss_seidel);
           grackle::impl::step_rate_gauss_seidel(
             dtit.data(), idx_range, anydust, rhoH.data(),
             spsolvbuf.dedot_prev, spsolvbuf.HIdot_prev, spsolvbuf.itmask_gs,
             itmask_metal.data(), my_chemistry, my_fields,
             spsolvbuf.species_tmpdens, spsolvbuf.rxn_rate_buf
           );
+          }  // GRACKLE_PROF_SCOPE(step_rate_gauss_seidel)
 
           // Solve rate equations with one linearly implicit Gauss-Seidel
           // sweep of a backward Euler method (for all cells specified by
           // itmask_nr)
+          { GRACKLE_PROF_SCOPE(step_rate_newton_raphson);
           grackle::impl::step_rate_newton_raphson(
             imetal, idx_range, dom, chunit, dx_cgs, c_ljeans,
             dtit.data(), tgas.data(), tdust.data(),
@@ -996,6 +1031,7 @@ int solve_rate_cool(
             logTlininterp_buf, cool1dmulti_buf, coolingheating_buf,
             spsolvbuf.chemheatrates_buf
           );
+          }  // GRACKLE_PROF_SCOPE(step_rate_newton_raphson)
 
         }
 
@@ -1014,6 +1050,21 @@ int solve_rate_cool(
         if (std::fabs(dt-ttmin) < tolerance*dt) { break; }
 
       }  // subcycle iteration loop (for current idx_range)
+
+      // record subcycle effort for this i-slice (no-op unless -DGRACKLE_PROFILE)
+#ifdef GRACKLE_PROFILE
+      {
+        // when the loop runs to completion, `iter` ends at max_iterations+1
+        int n_subcycles = (iter > my_chemistry->max_iterations)
+                              ? my_chemistry->max_iterations : iter;
+        GRACKLE_PROF_COUNT(islices, 1);
+        GRACKLE_PROF_COUNT(subcycles, n_subcycles);
+        GRACKLE_PROF_HIST_SUBCYCLE(n_subcycles);
+        if (iter > my_chemistry->max_iterations) {
+          GRACKLE_PROF_COUNT(islices_maxed_out, 1);
+        }
+      }
+#endif
 
       // review number of iterations that were spent in the subcycle loop
 
@@ -1086,6 +1137,7 @@ int solve_rate_cool(
 
     // Correct the species to ensure consistency (i.e. type conservation)
 
+    GRACKLE_PROF_SCOPE(make_consistent);
     grackle::impl::make_consistent(
         imetal, dom, my_chemistry,
         my_rates->opaque_storage->inject_pathway_props, my_fields);

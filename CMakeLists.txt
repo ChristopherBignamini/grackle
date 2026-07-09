@@ -95,6 +95,9 @@ option(GRACKLE_USE_DOUBLE "compile the code with double precision" ON)
 option(GRACKLE_DEFINE_INSTALL_RULES
   "enable Grackle's installation rules" ${GRACKLE_IS_TOP_LEVEL})
 option(GRACKLE_BUILD_TESTS "build Grackle tests driven by CTest" OFF)
+option(GRACKLE_PROFILE
+  "enable the lightweight solve_rate_cool profiling harness (per-kernel timers \
+and cell-path counters; dumped at exit). Adds overhead -- for measurement only" OFF)
 
 if (GRACKLE_BUILD_TESTS)
   set(_GRACKLE_EXAMPLES_DEFAULT ON)

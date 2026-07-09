@@ -21,6 +21,7 @@
 #include "grackle.h"             // gr_float
 #include "fortran_func_decls.h"  // gr_mask_int
 #include "fortran_func_wrappers.hpp" // grackle::impl::fortran_wrapper::gaussj_g
+#include "support/profiling.hpp"  // GRACKLE_PROF_* (no-op unless -DGRACKLE_PROFILE)
 #include "inject_model/grain_metal_inject_pathways.hpp"
 #include "internal_types.hpp"
 #include "internal_units.hpp"
@@ -545,11 +546,18 @@ inline void step_rate_newton_raphson(
             goto label_9996;
           }
 
-          // calc the time derivatives
+          GRACKLE_PROF_COUNT(newton_iterations, 1);
+
+          // calc the time derivatives (residual F)
+          { GRACKLE_PROF_SCOPE(nr_residual);
           wrapped_calc_derivatives(
             dt_FIXME, dsp.data(), dspdot.data(), pack, rhosp_grflt, rhosp_dot
           );
+          }
 
+          // build the Jacobian by finite differences: one derivatives() eval
+          // per species column (~nsp full rate evaluations)
+          { GRACKLE_PROF_SCOPE(nr_jacobian);
           for (jsp = 1; jsp<=(nsp); jsp++) {
             dspj = eps * dsp[idsp[jsp-1]];
             for (isp = 1; isp<=(nsp); isp++) {
@@ -578,6 +586,7 @@ inline void step_rate_newton_raphson(
             }
 
           }
+          }  // GRACKLE_PROF_SCOPE(nr_jacobian)
 
           for (isp = 1; isp<=(nsp); isp++) {
             for (jsp = 1; jsp<=(nsp); jsp++) {
@@ -601,7 +610,9 @@ inline void step_rate_newton_raphson(
             vec[isp-1] = vec[isp-1]/d(i,j,k);
           }
 
+          { GRACKLE_PROF_SCOPE(nr_gaussj);
           ierror = f_wrap::gaussj_g(nsp, mtrx.data(), vec.data());
+          }
           if(ierror == 1)  {
             goto label_9998;
           }

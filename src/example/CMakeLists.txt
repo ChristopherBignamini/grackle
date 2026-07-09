@@ -26,6 +26,12 @@ target_link_libraries(cxx_example Grackle::Grackle)
 if (GRACKLE_USE_OPENMP)
   add_executable(cxx_omp_example cxx_omp_example.cpp)
   target_link_libraries(cxx_omp_example Grackle::Grackle OpenMP::OpenMP_CXX)
+
+  # profiling driver for the GPU-porting effort: runs the maximal (pc=4 + metal
+  # + dust) config over a wide density/temperature grid. Pair with a library
+  # built using -DGRACKLE_PROFILE=ON to get the per-kernel profiling table.
+  add_executable(cxx_profile_example cxx_profile_example.cpp)
+  target_link_libraries(cxx_profile_example Grackle::Grackle OpenMP::OpenMP_CXX)
 endif()
 
 if (GRACKLE_USE_DOUBLE)

@@ -283,6 +283,10 @@ target_link_libraries(Grackle_Grackle
           GRACKLE_HDF5_C
           $<$<BOOL:${GRACKLE_USE_OPENMP}>:OpenMP::OpenMP_Fortran>
           $<$<BOOL:${GRACKLE_USE_OPENMP}>:OpenMP::OpenMP_C>
+          # required so the core library's C++ sources are compiled with the
+          # OpenMP flag (without this, _OPENMP is undefined in every .cpp file
+          # and the library's omp-parallel regions compile out)
+          $<$<BOOL:${GRACKLE_USE_OPENMP}>:OpenMP::OpenMP_CXX>
 )
 
 # add the necessary compiler-specific Fortran flags to ensure proper handling
@@ -326,3 +330,8 @@ endif()
 # - this is appealing since there's one less custom argument that needs to be passed
 #   to the compiler
 target_compile_definitions(Grackle_Grackle PRIVATE GRIMPL_COMPILING_CORE_LIB=1)
+
+# optional: enable the solve_rate_cool profiling harness (support/profiling.hpp)
+if (GRACKLE_PROFILE)
+  target_compile_definitions(Grackle_Grackle PRIVATE GRACKLE_PROFILE=1)
+endif()
