@@ -40,18 +40,26 @@
 //   y-axis (j) -> gas temperature         (log-spaced)  [drives table lookups]
 //   z-axis (k) -> metallicity in solar units (log-spaced) [drives metal path]
 // ---------------------------------------------------------------------------
-// NOTE on the density ceiling: with density_units == mh the internal `dom`
-// factor is ~1, so ddom ~ nH/0.76 and the Gauss-Seidel -> Newton-Raphson
-// threshold (ddom >= 1e8) sits near nH ~ 8e7 cm^-3. LOG_NH_MAX must clear that
-// to exercise NR, but the higher above it we go, the stiffer the cell: the
-// per-subcycle step is stiffness-limited, so the subcycle count needed to
-// integrate the full `dt` grows ~linearly with nH. 3e8 sits ~0.6 decade above
-// the NR threshold -- enough for a real NR band -- while staying tame enough
-// that, paired with the small default dt below, cells converge within the
-// subcycle cap. Push LOG_NH_MAX higher for more NR stress (and lower dt to
-// keep it converging), or lower for an even cleaner run.
-static const double LOG_NH_MIN   = -3.0;   // cm^-3  (very diffuse)
-static const double LOG_NH_MAX   =  8.5;   // cm^-3  (~0.6 decade above NR thresh)
+// Density-axis defaults; override at runtime with -p / -P (log10 nH min/max).
+//
+// With density_units == mh the internal `dom` factor is ~1, so ddom ~ nH/0.76.
+// Reference points on this axis:
+//   nH ~ 7.6e5 (log 5.88) -> ddom = 1e6 : NR threshold WHEN metals are present
+//   nH ~ 7.6e7 (log 7.88) -> ddom = 1e8 : NR threshold in general
+//
+// Choosing the ceiling is a trade-off:
+//  - it must clear the NR threshold to exercise Newton-Raphson at all, but the
+//    further above it you go the stiffer the cell. The per-subcycle step is
+//    stiffness-limited, so the subcycle count needed to integrate `dt` grows
+//    ~linearly with nH. The default (3e8, ~0.6 decade above the threshold)
+//    gives a real NR band while still converging within the subcycle cap at the
+//    small default dt. Raise it (with -P) for more NR stress -- and lower dt to
+//    keep it converging.
+//  - to profile the *Gauss-Seidel* path in the regime it actually runs in
+//    production, use `-s 2 -P 5.5`. Forcing GS onto denser cells makes it
+//    diverge into NaNs: those cells are precisely what NR exists for.
+static const double DEFAULT_LOG_NH_MIN = -3.0;  // cm^-3  (very diffuse)
+static const double DEFAULT_LOG_NH_MAX =  8.5;  // cm^-3  (~0.6 dec above NR thresh)
 static const double LOG_T_MIN    =  2.0;   // K      (100 K, molecular regime)
 static const double LOG_T_MAX    =  6.0;   // K      (1e6 K, collisional-ionization)
 static const double LOG_ZSOL_MIN = -4.0;   // Z/Zsun
@@ -79,7 +87,9 @@ int main(int argc, char* argv[]) {
                              // short dt is what lets high-density (NR) cells
                              // finish within MaxIter. Raise it to stress the
                              // solver (and expect the stiffest cells to max out).
-  while ((c = getopt(argc, argv, "ht:a:n:s:m:i:d:")) != -1) {
+  double log_nh_min = DEFAULT_LOG_NH_MIN;  // -p : log10 of min hydrogen density
+  double log_nh_max = DEFAULT_LOG_NH_MAX;  // -P : log10 of max hydrogen density
+  while ((c = getopt(argc, argv, "ht:a:n:s:m:i:d:p:P:")) != -1) {
     switch (c) {
       case 't': NThread      = atoi(optarg); break;
       case 'a': NIter        = atoi(optarg); break;
@@ -88,12 +98,15 @@ int main(int argc, char* argv[]) {
       case 'm': MultiMetals  = atoi(optarg); break;
       case 'i': MaxIter      = atoi(optarg); break;
       case 'd': dt_years     = atof(optarg); break;
+      case 'p': log_nh_min   = atof(optarg); break;
+      case 'P': log_nh_max   = atof(optarg); break;
       case 'h':
       case '?':
       default:
         fprintf(stderr,
                 "usage: %s [-t nthreads] [-a niters] [-n ncells_per_dim]\n"
-                "          [-s solver] [-m multi_metals] [-i max_iter] [-d dt_yr]\n",
+                "          [-s solver] [-m multi_metals] [-i max_iter] [-d dt_yr]\n"
+                "          [-p log10_nH_min] [-P log10_nH_max]\n",
                 argv[0]);
         fprintf(stderr,
                 "  Runs the full primordial_chemistry=4 + metal + dust config\n"
@@ -109,8 +122,15 @@ int main(int argc, char* argv[]) {
                 "  -i max_iter : subcycle cap per cell [1000]. Bounds worst-case\n"
                 "              work; the stiff high-density cells otherwise run\n"
                 "              to the library default of 10000 and appear hung.\n"
-                "  -d dt_yr  : timestep in years [1e3]. Larger => more subcycles.\n\n"
-                "  Tip: start small to confirm it completes, e.g. -n 4 -a 1.\n");
+                "  -d dt_yr  : timestep in years [1e3]. Larger => more subcycles.\n"
+                "  -p, -P    : log10 of the min/max hydrogen number density\n"
+                "              [%g .. %g] cm^-3. Reference points: log10(nH)=5.88\n"
+                "              is the NR threshold with metals, 7.88 without.\n"
+                "              To profile the Gauss-Seidel path in the regime it\n"
+                "              actually runs, use -s 2 -P 5.5 (forcing GS onto\n"
+                "              denser cells makes it produce NaNs).\n\n"
+                "  Tip: start small to confirm it completes, e.g. -n 4 -a 1.\n",
+                DEFAULT_LOG_NH_MIN, DEFAULT_LOG_NH_MAX);
         exit(1);
     }
   }
@@ -121,6 +141,20 @@ int main(int argc, char* argv[]) {
   if (SolverMethod < 1 || SolverMethod > 3) {
     fprintf(stderr, "ERROR: -s must be 1 (auto), 2 (force GS), or 3 (force NR)\n");
     exit(EXIT_FAILURE);
+  }
+  if (log_nh_min >= log_nh_max) {
+    fprintf(stderr, "ERROR: -p (%g) must be < -P (%g)\n", log_nh_min, log_nh_max);
+    exit(EXIT_FAILURE);
+  }
+  // Forcing Gauss-Seidel onto cells the hybrid would route to Newton-Raphson
+  // makes GS diverge (NaN species densities). Warn rather than silently produce
+  // garbage / crash.
+  if (SolverMethod == 2 && log_nh_max > 5.88) {
+    fprintf(stderr,
+            "WARNING: -s 2 (force Gauss-Seidel) with -P %g exceeds the NR\n"
+            "  threshold (log10 nH ~ 5.88 with metals). GS is not designed for\n"
+            "  those cells and may produce NaNs. Consider -P 5.5\n",
+            log_nh_max);
   }
   if (MultiMetals != 0) {
     // multi_metals=1 makes Grackle read per-injection-pathway metal densities
@@ -295,7 +329,7 @@ int main(int argc, char* argv[]) {
     for (int j = 0; j < NCell1D; j++) {
       double T = logspace(LOG_T_MIN, LOG_T_MAX, j, NCell1D);          // K
       for (int i = 0; i < NCell1D; i++) {
-        double nH = logspace(LOG_NH_MIN, LOG_NH_MAX, i, NCell1D);     // cm^-3
+        double nH = logspace(log_nh_min, log_nh_max, i, NCell1D);     // cm^-3
 
         int idx = i + NCell1D * (j + NCell1D * k);
 
@@ -365,7 +399,7 @@ int main(int argc, char* argv[]) {
           "  (profiling table, if enabled, is printed at exit)\n",
           NCell1D, N3, NThread, NIter, SolverMethod, solver_desc,
           dt_years, MaxIter,
-          LOG_NH_MIN, LOG_NH_MAX, LOG_T_MIN, LOG_T_MAX,
+          log_nh_min, log_nh_max, LOG_T_MIN, LOG_T_MAX,
           LOG_ZSOL_MIN, LOG_ZSOL_MAX);
   fprintf(stdout, "[progress] fields initialized, starting solve loop\n");
   fflush(stdout);
