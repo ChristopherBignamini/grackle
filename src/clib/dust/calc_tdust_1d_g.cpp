@@ -24,6 +24,7 @@
 #include "fortran_func_wrappers.hpp"
 #include "phys_constants.h"
 #include "support/config.hpp"
+#include "support/profiling.hpp"  // GRACKLE_PROF_* (no-op unless -DGRACKLE_PROFILE)
 #include "utils-cpp.hpp"
 
 #include "calc_tdust_1d_g.hpp"
@@ -153,7 +154,9 @@ void calc_tdust_1d_g(double* tdust, double* tgas, double* nh, double* gasgr,
 
   // Iterate to convergence with Newton's method
 
+  { GRACKLE_PROF_SCOPE(tdust_newton);
   for (iter = 1; iter <= (itmax); iter++) {
+    GRACKLE_PROF_COUNT(tdust_newton_iters, 1);
     // Loop over slice
 
     for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
@@ -227,9 +230,11 @@ void calc_tdust_1d_g(double* tdust, double* tgas, double* nh, double* gasgr,
 
     // End iteration loop for Newton's method
   }
+  }  // GRACKLE_PROF_SCOPE(tdust_newton)
 
   // If iteration count exceeded, try once more with bisection
   if (c_done < c_total) {
+    GRACKLE_PROF_SCOPE(tdust_bisection);
     for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
       if (bi_itmask[i] != MASK_FALSE) {
         tdustnow[i] = floored_trad;

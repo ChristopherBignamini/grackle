@@ -18,6 +18,7 @@
 
 #include "grackle.h"
 #include "fortran_func_wrappers.hpp"
+#include "support/profiling.hpp"  // GRACKLE_PROF_* (no-op unless -DGRACKLE_PROFILE)
 #include "utils-cpp.hpp"
 
 #include "calc_kappa_grain.hpp"
@@ -26,6 +27,7 @@ void grackle::impl::calc_kappa_grain(
     const double* tdust, double* kgr, const gr_mask_type* itmask, int in,
     IndexRange idx_range, double t_subl, int gr_N, int gr_Size, double gr_dT,
     const double* gr_Td, const double* logalsp_data_, int idspecies) {
+  GRACKLE_PROF_SCOPE(tdust_kappa);
   // Parameters
 
   // grain opacity from Omukai (2000, equation 17) normalized by

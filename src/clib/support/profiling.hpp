@@ -82,6 +82,23 @@ namespace grackle::impl::prof {
   X(nr_residual)         /* the single derivatives() eval (residual F)    */   \
   X(nr_jacobian)         /* finite-difference Jacobian: ~nsp derivs evals */   \
   X(nr_gaussj)           /* the dense nsp x nsp Gauss-Jordan linear solve */   \
+  /* sub-timers INSIDE cool1d_multi_g (per subcycle): */                       \
+  X(c1d_6species)        /* collisional H/He excite/ionize/recomb cooling  */  \
+  X(c1d_h2)              /* H2 cooling (3D table interpolation)            */   \
+  X(c1d_hd)              /* HD cooling (3D table interpolation)            */   \
+  X(c1d_dust)            /* dust-temperature solve + dust cooling rate     */   \
+  X(c1d_cloudy)          /* Cloudy primordial + metal cooling/heating      */   \
+  X(c1d_heating)         /* photoionization/photoelectric/compton/RT heat  */   \
+  /* sub-timers INSIDE lookup_cool_rates1d (per subcycle): */                  \
+  X(lk_collisional)      /* interpolate the collisional reaction rates     */   \
+  X(lk_h2heat)           /* interpolate H2-formation heating terms         */   \
+  X(lk_photo)            /* photo rates + secondary-ionization adjustments */   \
+  X(lk_dust)             /* dust rate lookups                              */   \
+  /* sub-timers INSIDE the dust-temperature solve (calc_tdust_1d_g): */        \
+  X(tdust_newton)        /* Newton root-find phase (per subcycle)          */   \
+  X(tdust_bisection)     /* bisection fallback phase                       */   \
+  X(tdust_kappa)         /* calc_kappa_grain: per-grain opacity (all calls)*/   \
+  X(tdust_balance)       /* calc_gr_balance_g: gas-grain energy balance    */   \
   X(make_consistent)                                                           \
   X(solve_rate_cool_total)
 
@@ -90,6 +107,7 @@ namespace grackle::impl::prof {
   X(cells_nr)            /* cell-subcycles solved with Newton-Raphson      */  \
   X(cells_nr_coevolve)   /* subset of NR that co-evolves internal energy   */  \
   X(newton_iterations)   /* total Newton iterations across all NR cells    */  \
+  X(tdust_newton_iters)  /* total dust-temp Newton iterations (slice-level)*/   \
   X(islices)             /* number of i-slices (j,k pairs) processed       */  \
   X(subcycles)           /* total subcycle iterations across all i-slices  */  \
   X(islices_maxed_out)   /* i-slices that hit max_iterations               */

@@ -24,6 +24,7 @@
 #include "full_rxn_rate_buf.hpp"
 #include "internal_types.hpp"
 #include "opaque_storage.hpp"
+#include "support/profiling.hpp"  // GRACKLE_PROF_* (no-op unless -DGRACKLE_PROFILE)
 #include "utils-cpp.hpp"
 
 namespace grackle::impl {
@@ -795,13 +796,16 @@ inline void lookup_cool_rates1d(
   // ----------------------------------------------
 
   // interpolate all collisional reaction rates
+  { GRACKLE_PROF_SCOPE(lk_collisional);
   interpolate_collisional_rxn_rates_(rxn_rate_buf, idx_range, tgas1d, itmask,
                                      dom, my_chemistry, my_fields, my_rates,
                                      logTlininterp_buf);
+  }  // GRACKLE_PROF_SCOPE(lk_collisional)
 
   // interpolate terms used to compute H2 formation heating terms.
   // (this is honestly a little out of place in this function)
   if (my_chemistry->primordial_chemistry > 1) {
+    GRACKLE_PROF_SCOPE(lk_h2heat);
     interpolate_h2_heating_terms_(chemheatrates_buf, idx_range, my_rates,
                                   itmask, logTlininterp_buf);
   }
@@ -809,6 +813,7 @@ inline void lookup_cool_rates1d(
   // Look-up rate for H2 formation on dust & (when relevant) grain growth rates
 
   if (anydust != MASK_FALSE) {
+    GRACKLE_PROF_SCOPE(lk_dust);
     lookup_dust_rates1d(idx_range, tdust, dust2gas, dom, itmask_metal, dt,
                         my_chemistry, my_rates, my_fields, grain_temperatures,
                         logTlininterp_buf, rxn_rate_buf,
@@ -822,6 +827,7 @@ inline void lookup_cool_rates1d(
   // custom external radiation fields.
   double* const* kph_buf = FullRxnRateBuf_kph_bufs(&rxn_rate_buf);
 
+  { GRACKLE_PROF_SCOPE(lk_photo);
   for (int i = idx_range.i_start; i < idx_range.i_stop; i++) {
     if (itmask[i] != MASK_FALSE) {
       // historically, k27 was treated as a special case:
@@ -860,6 +866,7 @@ inline void lookup_cool_rates1d(
                               my_chemistry->self_shielding_method, my_uvb_rates,
                               &calculator);
   }
+  }  // GRACKLE_PROF_SCOPE(lk_photo)
 
 #ifdef SECONDARY_IONIZATION_NOT_YET_IMPLEMENTED
   // If using a high-energy radiation field, then account for

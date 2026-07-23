@@ -27,6 +27,7 @@
 #include "dust_props.hpp"
 #include "inject_model/grain_metal_inject_pathways.hpp"
 #include "internal_types.hpp"
+#include "support/profiling.hpp"  // GRACKLE_PROF_* (no-op unless -DGRACKLE_PROFILE)
 #include "tabulated/cool1d_cloudy.hpp"
 #include "tabulated/cool1d_cloudy_old_tables.hpp"
 #include "utils-cpp.hpp"
@@ -318,6 +319,7 @@ void grackle::impl::cool1d_multi_g(
   }
 
   // --- 6 species cooling ---
+  { GRACKLE_PROF_SCOPE(c1d_6species);
 
   if (my_chemistry->primordial_chemistry > 0) {
     for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
@@ -456,10 +458,12 @@ void grackle::impl::cool1d_multi_g(
       }
     }
   }
+  }  // GRACKLE_PROF_SCOPE(c1d_6species)
 
   // --- H2 cooling ---
 
   if (my_chemistry->primordial_chemistry > 1) {
+    GRACKLE_PROF_SCOPE(c1d_h2);
     // Chiaki & Wise (2019) H2 cooling rate
     if (my_chemistry->h2_cooling_rate == 3) {
       for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
@@ -781,6 +785,7 @@ void grackle::impl::cool1d_multi_g(
   // --- Cooling from HD ---
 
   if (my_chemistry->primordial_chemistry > 2) {
+    GRACKLE_PROF_SCOPE(c1d_hd);
     // Chiaki & Wise (2019) HD cooling rate
     if (my_chemistry->hd_cooling_rate == 1) {
       for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
@@ -882,6 +887,7 @@ void grackle::impl::cool1d_multi_g(
     }
   }
 
+  { GRACKLE_PROF_SCOPE(c1d_dust);
   dust_related_props(anydust, tgas, cool1dmulti_buf.mynh, metallicity, itmask,
                      itmask_metal, my_chemistry, my_rates, my_fields, internalu,
                      idx_range, logTlininterp_buf, comp2, dust2gas, tdust,
@@ -981,9 +987,11 @@ void grackle::impl::cool1d_multi_g(
       tau_con[i] = alpha[i] * lshield_con[i];
     }
   }
+  }  // GRACKLE_PROF_SCOPE(c1d_dust)
 
   // --- Compute (external) radiative heating terms ---
   // Photoionization heating
+  { GRACKLE_PROF_SCOPE(c1d_heating);
 
   if (my_chemistry->primordial_chemistry > 0) {
     if (my_chemistry->self_shielding_method == 0) {  // no shielding
@@ -1143,10 +1151,12 @@ void grackle::impl::cool1d_multi_g(
       }
     }
   }
+  }  // GRACKLE_PROF_SCOPE(c1d_heating)
 
   // --- Cloudy primordial cooling and heating ---
 
   if (my_chemistry->primordial_chemistry == 0) {
+    GRACKLE_PROF_SCOPE(c1d_cloudy);
     iZscale = 0;
     mycmbTfloor = 0;
     grackle::impl::cool1d_cloudy(rhoH, metallicity, logTlininterp_buf.logtem,
@@ -1156,6 +1166,7 @@ void grackle::impl::cool1d_multi_g(
   }
 
   // Photo-electric heating by UV-irradiated dust
+  { GRACKLE_PROF_SCOPE(c1d_heating);
   dust_gas_edot::update_edot_photoelectric_heat(
       edot, tgas, dust2gas, rhoH, nelec_times_mH, myisrf.data(), itmask,
       my_chemistry, my_rates->gammah, idx_range, dom_inv);
@@ -1211,10 +1222,12 @@ void grackle::impl::cool1d_multi_g(
       }
     }
   }
+  }  // GRACKLE_PROF_SCOPE(c1d_heating)
 
   // --- Cloudy metal cooling and heating ---
 
   if (my_chemistry->metal_cooling == 1) {
+    GRACKLE_PROF_SCOPE(c1d_cloudy);
     // Determine if the temperature is above the threshold to do tabulated
     // cooling.
     for (i = idx_range.i_start; i <= idx_range.i_end; i++) {

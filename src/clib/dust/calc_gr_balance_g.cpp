@@ -19,6 +19,7 @@
 #include "grackle.h"
 #include "fortran_func_decls.h"
 #include "phys_constants.h"
+#include "support/profiling.hpp"  // GRACKLE_PROF_* (no-op unless -DGRACKLE_PROFILE)
 #include "utils-cpp.hpp"
 
 #include "calc_gr_balance_g.hpp"
@@ -30,6 +31,7 @@ void calc_gr_balance_g(double* tdust, const double* tgas, const double* kgr,
                        const double* gamma_isrf, const double* nh,
                        const gr_mask_type* itmask, double* sol,
                        IndexRange idx_range) {
+  GRACKLE_PROF_SCOPE(tdust_balance);
   // Parameters
 
   const double radf = 4. * sigma_sb_grflt;
