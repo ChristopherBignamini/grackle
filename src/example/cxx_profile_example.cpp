@@ -60,8 +60,12 @@
 //    diverge into NaNs: those cells are precisely what NR exists for.
 static const double DEFAULT_LOG_NH_MIN = -3.0;  // cm^-3  (very diffuse)
 static const double DEFAULT_LOG_NH_MAX =  8.5;  // cm^-3  (~0.6 dec above NR thresh)
-static const double LOG_T_MIN    =  2.0;   // K      (100 K, molecular regime)
-static const double LOG_T_MAX    =  6.0;   // K      (1e6 K, collisional-ionization)
+// Temperature axis (override with -y / -Y). Note: above the grain sublimation
+// temperature (~1500-2000 K, log10 ~ 3.2-3.3) the dust-temperature solve is
+// forced into its (expensive) bisection branch. Cap at -Y 3.3 to profile dust
+// in the regime where grains physically survive.
+static const double DEFAULT_LOG_T_MIN =  2.0;   // K      (100 K, molecular regime)
+static const double DEFAULT_LOG_T_MAX =  6.0;   // K      (1e6 K, coll.-ionization)
 static const double LOG_ZSOL_MIN = -4.0;   // Z/Zsun
 static const double LOG_ZSOL_MAX =  0.0;   // Z/Zsun
 
@@ -89,7 +93,9 @@ int main(int argc, char* argv[]) {
                              // solver (and expect the stiffest cells to max out).
   double log_nh_min = DEFAULT_LOG_NH_MIN;  // -p : log10 of min hydrogen density
   double log_nh_max = DEFAULT_LOG_NH_MAX;  // -P : log10 of max hydrogen density
-  while ((c = getopt(argc, argv, "ht:a:n:s:m:i:d:p:P:")) != -1) {
+  double log_t_min  = DEFAULT_LOG_T_MIN;   // -y : log10 of min temperature (K)
+  double log_t_max  = DEFAULT_LOG_T_MAX;   // -Y : log10 of max temperature (K)
+  while ((c = getopt(argc, argv, "ht:a:n:s:m:i:d:p:P:y:Y:")) != -1) {
     switch (c) {
       case 't': NThread      = atoi(optarg); break;
       case 'a': NIter        = atoi(optarg); break;
@@ -100,13 +106,16 @@ int main(int argc, char* argv[]) {
       case 'd': dt_years     = atof(optarg); break;
       case 'p': log_nh_min   = atof(optarg); break;
       case 'P': log_nh_max   = atof(optarg); break;
+      case 'y': log_t_min    = atof(optarg); break;
+      case 'Y': log_t_max    = atof(optarg); break;
       case 'h':
       case '?':
       default:
         fprintf(stderr,
                 "usage: %s [-t nthreads] [-a niters] [-n ncells_per_dim]\n"
                 "          [-s solver] [-m multi_metals] [-i max_iter] [-d dt_yr]\n"
-                "          [-p log10_nH_min] [-P log10_nH_max]\n",
+                "          [-p log10_nH_min] [-P log10_nH_max]\n"
+                "          [-y log10_T_min] [-Y log10_T_max]\n",
                 argv[0]);
         fprintf(stderr,
                 "  Runs the full primordial_chemistry=4 + metal + dust config\n"
@@ -128,9 +137,14 @@ int main(int argc, char* argv[]) {
                 "              is the NR threshold with metals, 7.88 without.\n"
                 "              To profile the Gauss-Seidel path in the regime it\n"
                 "              actually runs, use -s 2 -P 5.5 (forcing GS onto\n"
-                "              denser cells makes it produce NaNs).\n\n"
+                "              denser cells makes it produce NaNs).\n"
+                "  -y, -Y    : log10 of the min/max temperature [%g .. %g] K.\n"
+                "              Above the grain sublimation temp (log10 ~ 3.3) the\n"
+                "              dust-temperature solve is forced into bisection;\n"
+                "              use -Y 3.3 to profile dust where grains survive.\n\n"
                 "  Tip: start small to confirm it completes, e.g. -n 4 -a 1.\n",
-                DEFAULT_LOG_NH_MIN, DEFAULT_LOG_NH_MAX);
+                DEFAULT_LOG_NH_MIN, DEFAULT_LOG_NH_MAX,
+                DEFAULT_LOG_T_MIN, DEFAULT_LOG_T_MAX);
         exit(1);
     }
   }
@@ -144,6 +158,10 @@ int main(int argc, char* argv[]) {
   }
   if (log_nh_min >= log_nh_max) {
     fprintf(stderr, "ERROR: -p (%g) must be < -P (%g)\n", log_nh_min, log_nh_max);
+    exit(EXIT_FAILURE);
+  }
+  if (log_t_min >= log_t_max) {
+    fprintf(stderr, "ERROR: -y (%g) must be < -Y (%g)\n", log_t_min, log_t_max);
     exit(EXIT_FAILURE);
   }
   // Forcing Gauss-Seidel onto cells the hybrid would route to Newton-Raphson
@@ -327,7 +345,7 @@ int main(int argc, char* argv[]) {
   for (int k = 0; k < NCell1D; k++) {
     double Zsolar = logspace(LOG_ZSOL_MIN, LOG_ZSOL_MAX, k, NCell1D); // Z/Zsun
     for (int j = 0; j < NCell1D; j++) {
-      double T = logspace(LOG_T_MIN, LOG_T_MAX, j, NCell1D);          // K
+      double T = logspace(log_t_min, log_t_max, j, NCell1D);          // K
       for (int i = 0; i < NCell1D; i++) {
         double nH = logspace(log_nh_min, log_nh_max, i, NCell1D);     // cm^-3
 
@@ -399,7 +417,7 @@ int main(int argc, char* argv[]) {
           "  (profiling table, if enabled, is printed at exit)\n",
           NCell1D, N3, NThread, NIter, SolverMethod, solver_desc,
           dt_years, MaxIter,
-          log_nh_min, log_nh_max, LOG_T_MIN, LOG_T_MAX,
+          log_nh_min, log_nh_max, log_t_min, log_t_max,
           LOG_ZSOL_MIN, LOG_ZSOL_MAX);
   fprintf(stdout, "[progress] fields initialized, starting solve loop\n");
   fflush(stdout);
