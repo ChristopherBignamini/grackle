@@ -72,6 +72,7 @@ namespace grackle::impl::prof {
 
 #define GRACKLE_PROF_TIMER_LIST                                                \
   X(extended_gas_props)                                                        \
+  X(dust_solver)         /* DustSolver::calc_Tdust_and_chem_contrib        */   \
   X(cool1d_multi_g)                                                            \
   X(lookup_cool_rates1d)                                                       \
   X(rate_timestep)                                                             \
@@ -86,19 +87,20 @@ namespace grackle::impl::prof {
   X(c1d_6species)        /* collisional H/He excite/ionize/recomb cooling  */  \
   X(c1d_h2)              /* H2 cooling (3D table interpolation)            */   \
   X(c1d_hd)              /* HD cooling (3D table interpolation)            */   \
-  X(c1d_dust)            /* dust-temperature solve + dust cooling rate     */   \
   X(c1d_cloudy)          /* Cloudy primordial + metal cooling/heating      */   \
-  X(c1d_heating)         /* photoionization/photoelectric/compton/RT heat  */   \
+  X(c1d_heating)         /* photoionization/compton/RT heating             */   \
   /* sub-timers INSIDE lookup_cool_rates1d (per subcycle): */                  \
   X(lk_collisional)      /* interpolate the collisional reaction rates     */   \
   X(lk_h2heat)           /* interpolate H2-formation heating terms         */   \
   X(lk_photo)            /* photo rates + secondary-ionization adjustments */   \
-  X(lk_dust)             /* dust rate lookups                              */   \
-  /* sub-timers INSIDE the dust-temperature solve (calc_tdust_1d_g): */        \
+  /* sub-timers INSIDE dust_solver (per subcycle; also per cell in NR): */     \
+  X(dust_props)          /* dust_related_props: Tdust solve + opacities    */   \
+  X(dust_edot)           /* dust cooling, photoelectric, recombination     */   \
+  X(dust_rxn_rates)      /* H2-on-dust formation + grain growth rates      */   \
+  /* sub-timers INSIDE the dust-temperature solve (calc_tdust_1d): */          \
   X(tdust_newton)        /* Newton root-find phase (per subcycle)          */   \
   X(tdust_bisection)     /* bisection fallback phase                       */   \
-  X(tdust_kappa)         /* calc_kappa_grain: per-grain opacity (all calls)*/   \
-  X(tdust_balance)       /* calc_gr_balance_g: gas-grain energy balance    */   \
+  X(tdust_kappa)         /* root fn: grain opacity + energy balance (fused)*/   \
   X(make_consistent)                                                           \
   X(solve_rate_cool_total)
 

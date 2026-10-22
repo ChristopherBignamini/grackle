@@ -92,33 +92,5 @@ elseif(HDF5_VERSION VERSION_GREATER "1.6")
 endif()
 
 if (GRACKLE_USE_OPENMP)
-  if (CMAKE_GENERATOR STREQUAL "Ninja")
-    message(WARNING
-      "using Ninja with GRACKLE_USE_OPENMP=ON may cause compilation problems."
-      "The issues manifest as error with finding the \"omp_lib.h\" header "
-      "that is conditionally included by some Fortran source files when using "
-      "CMake. The quick fix is use Makefiles. See the docs for more info"
-    )
-  endif()
-
-  # CXX is required unconditionally: the core library is now C++, so its
-  # parallel regions (e.g. the omp-parallel loop in solve_rate_cool) and the
-  # _OPENMP guards in the C++ sources only take effect if the .cpp files are
-  # compiled with the OpenMP flag carried by OpenMP::OpenMP_CXX.
-  find_package(OpenMP REQUIRED COMPONENTS C Fortran CXX)
-endif()
-
-# define target to link the math functions of the C standard library
-# (i.e. the -lm flag). This is commonly needed on unix-like platforms
-# -> For platforms that don't need libm, this target acts as a dummy
-#    placeholder (that does nothing)
-# -> The -lm flag should NOT be used on MacOS (while CMake is smart enough to
-#    not pass it to the linker, it will mess with exporting linker flags)
-#
-# NOTE: when we start using C++ in the core grackle library, we can remove
-# everything related to the toolchain::m variable (since the C++ runtime
-# library is ALWAYS linked to the math functions)
-add_library(toolchain::m INTERFACE IMPORTED)
-if (UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set_target_properties(toolchain::m PROPERTIES IMPORTED_LIBNAME "m")
+  find_package(OpenMP REQUIRED COMPONENTS CXX)
 endif()

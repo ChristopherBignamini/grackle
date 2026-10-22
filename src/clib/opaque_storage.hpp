@@ -16,8 +16,10 @@
 #include <cstddef>
 #include "grackle.h"
 #include "dust/grain_species_info.hpp"
+#include "dust/solver.hpp"
 #include "inject_model/grain_metal_inject_pathways.hpp"
 #include "internal_types.hpp"
+#include "interp_grid.hpp"
 #include "ratequery.hpp"
 #include "support/config.hpp"
 
@@ -88,7 +90,32 @@ struct gr_opaque_storage {
   ///   track this grid. An argument could be made for breaking this up and
   ///   explicitly tracking a grid of ln(Tgas) values and a grid of ln(Tdust)
   ///   values (for debugging purposes).
-  gr_interp_grid_props h2dust_grain_interp_props;
+  GRIMPL_NS::InterpGridProps h2dust_grain_interp_props;
+
+  // The next 8 attributes hold interpolation grids representing collision
+  // rates of a species with HI or H2I. The parameters along each axis are:
+  //   grid.parameter[0]: log10( ndens_{species} / (dv/dr) )
+  //   grid.parameter[1]: log10( T )
+  //   grid.parameter[2]: log10( ndens_HI ) OR log10( ndens_H2I )
+
+  /// H2 and HD cooling rates (collision with HI; Hollenbach & McKee 1979
+  GRIMPL_NS::InterpGrid LH2;
+  GRIMPL_NS::InterpGrid LHD;
+
+  /// Fine-structure cooling rates (collision with HI; Maio et al. 2007)
+  GRIMPL_NS::InterpGrid LCI;
+  GRIMPL_NS::InterpGrid LCII;
+  GRIMPL_NS::InterpGrid LOI;
+
+  /// metal molecular cooling rates (collision with H2I; UMIST table)
+  GRIMPL_NS::InterpGrid LCO;
+  GRIMPL_NS::InterpGrid LOH;
+  GRIMPL_NS::InterpGrid LH2O;
+
+  /// primordial opacity table
+  /// -> alphap.parameters[0] is log10(mass density)
+  /// -> alphap.parameters[1] is log10(temperature)
+  GRIMPL_NS::InterpGrid alphap;
 
   /// Tracks basic information about each relevant grain species
   ///
@@ -97,12 +124,21 @@ struct gr_opaque_storage {
   /// > GrainSpeciesInfo instances directly inside of this struct (since it
   /// > contains some extra information that is unnecessary during the
   /// > calculations). An alternative would be to briefly initialize an
-  /// > instance during setup and then repack the data.
+  /// > instance during setup and then repack the data (perhaps inside of the
+  /// > @ref dust_solver member)
   GRIMPL_NS::GrainSpeciesInfo* grain_species_info = nullptr;
 
   /// Tracks metal and grain yields for each modeled injection pathway as well
   /// as other grain properties
   GRIMPL_NS::GrainMetalInjectPathways* inject_pathway_props = nullptr;
+
+  /// represents the dust soler
+  ///
+  /// In the near future, we may want to explicitly make dust_solver a pointer
+  /// and have it take responsibility for tracking information, say from
+  /// @ref grain_species_info (or perhaps @ref inject_pathway_props after that
+  /// member is no longer used with metal chemistry)
+  GRIMPL_NS::DustSolver dust_solver;
 
   /// used to implement the experimental ratequery machinery
   GRIMPL_NS::ratequery::Registry* registry = nullptr;

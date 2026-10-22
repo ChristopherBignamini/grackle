@@ -35,82 +35,70 @@ void rate_timestep_g(double* dedot, double* HIdot, gr_mask_type anydust,
                      FullRxnRateBuf rxn_rate_buf) {
   // Density fields
 
-  grackle::impl::View<gr_float***> de(
+  FortranView<gr_float***> de(
       my_fields->e_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> HI(
+  FortranView<gr_float***> HI(
       my_fields->HI_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> HII(
+  FortranView<gr_float***> HII(
       my_fields->HII_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> HeI(
+  FortranView<gr_float***> HeI(
       my_fields->HeI_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> HeII(
+  FortranView<gr_float***> HeII(
       my_fields->HeII_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> HeIII(
+  FortranView<gr_float***> HeIII(
       my_fields->HeIII_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> d(
-      my_fields->density, my_fields->grid_dimension[0],
-      my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> HM(
+  FortranView<gr_float***> d(my_fields->density, my_fields->grid_dimension[0],
+                             my_fields->grid_dimension[1],
+                             my_fields->grid_dimension[2]);
+  FortranView<gr_float***> HM(
       my_fields->HM_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> H2I(
+  FortranView<gr_float***> H2I(
       my_fields->H2I_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> H2II(
+  FortranView<gr_float***> H2II(
       my_fields->H2II_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> metal(
+  FortranView<gr_float***> metal(
       my_fields->metal_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
 
   // Radiative Transfer Fields
-  grackle::impl::View<gr_float***> kphHI(
+  FortranView<gr_float***> kphHI(
       my_fields->RT_HI_ionization_rate, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> kphHeI(
+  FortranView<gr_float***> kphHeI(
       my_fields->RT_HeI_ionization_rate, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> kphHeII(
+  FortranView<gr_float***> kphHeII(
       my_fields->RT_HeII_ionization_rate, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
 
-  grackle::impl::View<gr_float***> HDI(
+  FortranView<gr_float***> HDI(
       my_fields->HDI_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
 
-  grackle::impl::View<gr_float***> CI(
+  FortranView<gr_float***> CI(
       my_fields->CI_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> OI(
+  FortranView<gr_float***> OI(
       my_fields->OI_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> OH(
-      my_fields->OH_density, my_fields->grid_dimension[0],
+  FortranView<gr_float***> OHI(
+      my_fields->OHI_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> H2O(
-      my_fields->H2O_density, my_fields->grid_dimension[0],
+  FortranView<gr_float***> H2OI(
+      my_fields->H2OI_density, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
 
-  grackle::impl::View<gr_float***> kdissHDI(
+  FortranView<gr_float***> kdissHDI(
       my_fields->RT_HDI_dissociation_rate, my_fields->grid_dimension[0],
-      my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> kphCI(
-      my_fields->RT_CI_ionization_rate, my_fields->grid_dimension[0],
-      my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> kphOI(
-      my_fields->RT_OI_ionization_rate, my_fields->grid_dimension[0],
-      my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> kdissOH(
-      my_fields->RT_OH_dissociation_rate, my_fields->grid_dimension[0],
-      my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
-  grackle::impl::View<gr_float***> kdissH2O(
-      my_fields->RT_H2O_dissociation_rate, my_fields->grid_dimension[0],
       my_fields->grid_dimension[1], my_fields->grid_dimension[2]);
 
   // locals
@@ -409,28 +397,24 @@ void rate_timestep_g(double* dedot, double* HIdot, gr_mask_type anydust,
         }
       }
     }
-    if ((my_chemistry->metal_chemistry > 0) &&
-        (my_chemistry->radiative_transfer_metal_ionization > 0)) {
-      for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
-        if (itmask[i] != MASK_FALSE) {
-          dedot[i] = dedot[i] +
-                     kphCI(i, idx_range.j, idx_range.k) *
-                         CI(i, idx_range.j, idx_range.k) / 12.0 +
-                     kphOI(i, idx_range.j, idx_range.k) *
-                         OI(i, idx_range.j, idx_range.k) / 16.0;
-        }
-      }
-    }
-    if ((my_chemistry->metal_chemistry > 0) &&
-        (my_chemistry->radiative_transfer_metal_dissociation > 0)) {
-      for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
-        if (itmask[i] != MASK_FALSE) {
-          HIdot[i] = HIdot[i] +
-                     kdissOH(i, idx_range.j, idx_range.k) *
-                         OH(i, idx_range.j, idx_range.k) / 17.0 +
-                     kdissH2O(i, idx_range.j, idx_range.k) *
-                         H2O(i, idx_range.j, idx_range.k) / 18.0;
-        }
+  }
+
+  // Add photo-ionization/photo-dissociation of metal species (UV background
+  // + radiative transfer)
+
+  if (my_chemistry->metal_chemistry > 0) {
+    for (i = idx_range.i_start; i <= idx_range.i_end; i++) {
+      if (itmask[i] != MASK_FALSE) {
+        dedot[i] = dedot[i] +
+                   kph_buf[PhotoRxnLUT::kphCI][i] *
+                       CI(i, idx_range.j, idx_range.k) / 12.0 +
+                   kph_buf[PhotoRxnLUT::kphOI][i] *
+                       OI(i, idx_range.j, idx_range.k) / 16.0;
+        HIdot[i] = HIdot[i] +
+                   kph_buf[PhotoRxnLUT::kdissOH][i] *
+                       OHI(i, idx_range.j, idx_range.k) / 17.0 +
+                   kph_buf[PhotoRxnLUT::kdissH2O][i] *
+                       H2OI(i, idx_range.j, idx_range.k) / 18.0;
       }
     }
   }

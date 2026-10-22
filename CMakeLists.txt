@@ -31,7 +31,7 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
                                 # robust (& addresses noisy warnings)
 endif()
 
-project(Grackle VERSION ${_GRACKLE_VERSION_NO_DEVTAG} LANGUAGES C CXX Fortran)
+project(Grackle VERSION ${_GRACKLE_VERSION_NO_DEVTAG} LANGUAGES CXX)
 
 # Specify that `./cmake` contains cmake modules defining useful functionality
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -57,40 +57,6 @@ convenience_prepare_clang_tidy()
 # Project-Wide Configuration
 # --------------------------
 
-# perform some basic checks
-if (NOT GRACKLE_IS_TOP_LEVEL)
-  if ( NOT ("Fortran" IN_LIST PRE_ENABLED_LANGUAGES) )
-    # technically, this is only an issue when building Grackle as a static
-    # library, but we raise an error anyways for a consistent experience
-    #
-    # based on the answers to the following post, we will reassess the approach
-    # we take in this scenario
-    #   https://discourse.cmake.org/t/conventions-for-linking-implicit-dependencies-of-an-embedded-multi-language-static-library/11073
-    message(FATAL_ERROR
-      "The top-level project in which the Grackle-build is embedded doesn't"
-      "list Fortran as an enabled language. This will cause linking issues"
-      "when Grackle is built as a static library (like the current build)."
-      ""
-      "To fix this, either add Fortran to the language list specified in"
-      "the top-level project command OR call enable_language(Fortran)"
-      "before embedding Grackle (see the latest CMake docs for restrictions"
-      "about where enable_language may be called")
-  endif()
-
-elseif (GRACKLE_IS_TOP_LEVEL)
-  # the following 2 checks are only enforced when Grackle is built standalone
-  # (we let people do whatever when it's embedded for maximum flexibility)
-
-  if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
-    message(FATAL_ERROR "Please don't perform an in-source build.")
-  endif()
-
-  if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    message(STATUS "no build type detected, defaulting to Release build-type")
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-  endif()
-endif()
-
 option(GRACKLE_USE_DOUBLE "compile the code with double precision" ON)
 option(GRACKLE_DEFINE_INSTALL_RULES
   "enable Grackle's installation rules" ${GRACKLE_IS_TOP_LEVEL})
@@ -106,6 +72,55 @@ else()
 endif()
 option(GRACKLE_EXAMPLES
   "compile grackle examples" ${_GRACKLE_EXAMPLES_DEFAULT})
+
+# perform some basic checks
+if (GRACKLE_IS_TOP_LEVEL)
+  # the following 2 checks are only enforced when Grackle is built standalone
+  # (we let people do whatever when it's embedded for maximum flexibility)
+
+  if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
+    message(FATAL_ERROR "Please don't perform an in-source build.")
+  endif()
+
+  if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "no build type detected, defaulting to Release build-type")
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+  endif()
+endif()
+
+# perform some checks related to enabled languages
+if ((NOT GRACKLE_IS_TOP_LEVEL) AND NOT ("CXX" IN_LIST PRE_ENABLED_LANGUAGES))
+  # technically, this is only an issue when building Grackle as a static
+  # library, but we raise an error anyways for a consistent experience
+  message(FATAL_ERROR
+    "The top-level project in which the Grackle-build is embedded doesn't"
+    "list CXX as an enabled language. This will cause linking issues"
+    "when Grackle is built as a static library (like the current build)."
+    ""
+    "To fix this, either add CXX to the language list specified in"
+    "the top-level project command OR call enable_language(CXX)"
+    "before embedding Grackle (see the latest CMake docs for restrictions"
+    "about where enable_language may be called")
+endif()
+
+if (GRACKLE_EXAMPLES)
+  include(CheckLanguage)
+  foreach(_LANG "C" "Fortran")
+    if (GRACKLE_IS_TOP_LEVEL)
+      check_language(${_LANG})
+      if (CMAKE_${_LANG}_COMPILER)
+        enable_language(${_LANG})
+      else()
+        message(STATUS "No examples written in ${_LANG} will be built")
+      endif()
+    elseif(NOT ("${_LANG}" IN_LIST PRE_ENABLED_LANGUAGES))
+      message(STATUS
+        "Because the top-level project in which the Grackle-build is embedded "
+        "doesn't list ${_LANG} as an enabled language, the examples written in "
+        "that language won't be built")
+    endif()
+  endforeach()
+endif()
 
 # configure custom machine-specific optimization-flags (specified in host-config
 # files). I'm not really sure we should support this when Grackle isn't the
